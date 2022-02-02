@@ -1,115 +1,9 @@
 # Import socket module
-from socket import * 
+from socket import *
+import struct 
 import sys # In order to terminate the program
-
-# import struct to create the following sctruct as specified
 from struct import *
 from random import *
-
-# returns udp_port, packetA (struct)
-def phaseA(packet, serverSocket):
-
-	
-
-	data_length, PCODE, ENTITY, data = unpack("!IHH24s", packet)
-
-	checkMsg = "hello world!!!00"
-	temp = data.decode()
-	# temp = temp.replace("0", "")	
-	print(temp + " this is temp")
-	temp2 = temp.strip("0")
-	print(temp2 + " this is t emp2")
-	# checks for server to terminate socket connection
-	if (data_length % 4 != 0 ):
-		print("CLOSING SOCKET")
-		serverSocket.close()
-	if (PCODE != 0):
-		print("CLOSING SOCKET2")
-		serverSocket.close()
-	if (str(temp) == checkMsg.lower()):
-		print(temp)
-		print("CLOSING SOCKET3")
-		print(checkMsg.lower())
-		serverSocket.close()
-	if(ENTITY != 1):
-		print("CLOSING SOCKET4")
-		serverSocket.close()
-
-	repeat = randint(5,20)
-	udp_port = randint(20000, 30000)
-	aLen = randint(50,100)
-	codeA = randint(100, 400)
-	ENTITY = 2
-	"""
-	STRUCT:::::
-
-	data_length ==> len(data)
-	pcode == 0
-	entity ==> 2 
-	repeat ==> random integer (4 bytes) between 5 and 20
-	udp_port ==> random integer (4 bytes) between 20000 and 30000
-	len  ==> short random number between 50 and 100
-	codeA ==> short random number between 100 and 40
-	"""
-
-	print("sending to the client: data_length: {}  code: {}  entity: {} repeat: {} udp_port: {}  len: {} codeA: {}".format(
-		data_length, codeA, ENTITY, repeat, udp_port, aLen, codeA))
-
-	packet = pack("!IHHIIHH", data_length, PCODE, ENTITY, repeat, udp_port, aLen, codeA)
-
-	return udp_port, packet, repeat
-
-	# end of phase a check
-
-#return sendingPacket, repeatDone and PacketB1 (sever reply)
-def phaseBSend(packet, serverSocket, repeat):
-	repeatDone = False
-	sendingPacket = False
-
-	data_length, PCODE, ENTITY, packetID, data = unpack("!IHHIs", packet)
-
-	print("SERVER: received_packet_id =  {} data_len =  {} pcode: {}".format(packetID, data_length, PCODE))
-
-
-	if (data_length % 4 != 0 ):
-		print("CLOSING SOCKET")
-		serverSocket.close()
-	if (PCODE != 0):
-		print("CLOSING SOCKET2")
-		serverSocket.close()
-	if(ENTITY != 1):
-		print("CLOSING SOCKET4")
-		serverSocket.close()
-
-	ack = randint(0,1)
-
-
-	if (ack == 1 ): 
-		sendingPacket = True
-	ak_packet_id = packetID
-
-	if (ak_packet_id == repeat -1):
-		repeatDone = True
-
-	"""
-	Struc
-
-	data_len
-	pcode = codeA
-	enty
-	ak_packet_id -> packet id
-
-	"""
-
-	data_length = 4
-	ENTITY = 2
-
-	print("SERVER: received_packet_id =  {} data_len =  {}  pcode: {}".format(ak_packet_id, data_length, PCODE))
-	packetB1 = pack("!IHHI", data_length, PCODE, ENTITY, ak_packet_id)
-
-	return sendingPacket, repeatDone, packetB1;
-	
-
 
 # Assign a port number
 serverPort = 12000
@@ -118,41 +12,75 @@ serverSocket = socket(AF_INET, SOCK_DGRAM)
 # Bind the socket to server address and server port
 serverSocket.bind(("", serverPort))
 
-# while True:
-
 print('The server is ready to receive')
+print("-------------Starting Stage A --------------")
+print()
+#serverSocket.settimeout(100)
+
+sentenceStruct, clientAddress = serverSocket.recvfrom(1024)
+dLength, pCode, ENTITY, data = struct.unpack('!IHH24s', sentenceStruct)
+decodeSentence = data.decode()
+print("receiving from the client: data_len: {} pcode: {} entity: {} data: {}".format(dLength, pCode, ENTITY, data))
+
+if (dLength % 4 != 0):
+	print("Incorect data length CLOSING CONNECTION")
+	serverSocket.close()
+		
+#decodeSentence = str(decodeSentence).replace('0', "")
+if(str(decodeSentence) == "Hello World!!!"):
+	print("Incorect data CLOSING CONNECTION")
+	serverSocket.close()
+		
+if(pCode != 0 or ENTITY != 1):
+	print("incorect PCode or entity CLOSING CONNECTION")
+	serverSocket.close()
+		
+repeat = randint(5,20)
+udp_port = randint(20000,30000)
+len = randint(50,100)
+codeA = randint(100,400)
+ENTITY2 = 2
+dLength = 12
+print("sending to the client: data_len: {} pcode: {} entity: {} repeat: {} udp_port: {} len: {} codeA: {}".format(dLength, pCode, ENTITY2, repeat, udp_port, len, codeA))
+phaseAS = struct.pack("!IHHIIHH", dLength, pCode, ENTITY2, repeat, udp_port, len, codeA)
+serverSocket.sendto(phaseAS, clientAddress)
+#start listening on udp_port sent to client
+
+serverSocket.close()
+
+serverSocket2 = socket(AF_INET, SOCK_DGRAM)
+serverSocket2.bind(("",udp_port))
+print("SERVER: Server ready on the new UDP port: {}".format(udp_port))
+print("SERVER:------------------ End of Stage A ------------")
+print()
+print("SERVER:----------------- Starting Stage B -----------")
 
 while True:
+	#may have to add 3 sec timeout here 
+	phaseBC, clientAddress = serverSocket2.recvfrom(1024)
+	dLength2, pCode, ENTITY, packet_id, data = struct.unpack('!IHHIs', phaseBC)
+	print("SERVER: received_packet_id = {} data_len = {} pcode: {}".format(packet_id,dLength2,pCode))
+	
+	if(dLength2 % 4 != 0):
+		print("Incorect data length CLOSING CONNECTION")
+		serverSocket2.close()
+	
+	if(pCode != codeA or ENTITY != 1):
+		print("incorect PCode or entity CLOSING CONNECTION")
+		serverSocket2.close()
+	
+	if(packet_id == repeat - 1):
+		break
+	
+	coin = randint(0,1)
+	dLength = 4
 
-	firstPass, clientAddress = serverSocket.recvfrom(1024)
-	# we check if it pases phase A
-	udp_port, firstPassPacket, repeat= phaseA(firstPass, serverSocket)
-	serverSocket.sendto(firstPassPacket, clientAddress)
+	if (coin == 1):
+		print("Sending acknowledgement")
+		acked_packet_id = packet_id + 1
+		ackStruct = struct.pack('!IHHI',dLength,pCode,ENTITY2,acked_packet_id)
+		serverSocket2.sendto(ackStruct,clientAddress)
 
-	# listen to new udp_port FIXMEE
-	serverSocket2 = socket(AF_INET, SOCK_DGRAM)
-	serverSocket2.bind(("", udp_port))
+	
 
-	secondPass, clientAddress = serverSocket2.recvfrom(1024)
-
-
-	sendingPacket, repeatDone, packetB1 = phaseBSend(secondPass, serverSocket2, repeat)
-
-	while not repeatDone:
-
-		if (sendingPacket):
-			serverSocket2.sendto(secondPass, clientAddress)
-			secondPass, clientAddress = serverSocket2.recvfrom(1024)
-			sendingPacket, repeatDone, packetB1 = phaseBSend(secondPass, serverSocket2, repeat)
-		else:
-			secondPass, clientAddress = serverSocket2.recvfrom(1024)
-			sendingPacket, repeatDone, packetB1 = phaseBSend(secondPass, serverSocket2, repeat)
-
-
-
-
-
-
-
-serverSocket.close()  
-sys.exit() 	#Terminate the program after sending the corresponding data
+sys.exit()#Terminate the program after sending the corresponding data

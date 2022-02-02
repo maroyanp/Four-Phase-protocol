@@ -1,57 +1,9 @@
 # Import socket module
+from ast import While
 from socket import * 
 import sys # In order to terminate the program
-from struct import *
-
-# returns packetPhaseB1, udp_port, done repeating
-def phaseBclient1SEND(packet, i):
-
-    doneRepeat = False
-    # packet = pack("!IHHIIHH", data_length, PCODE, ENTITY, repeat, udp_port, aLen, codeA)
-
-    data_length, PCODE, ENTITY, repeat, udp_port, aLen, codeA = unpack("!IHHIIHH", packet)
-
-    """
-    struct
-
-    data len 
-    pcode = codeA
-    entity = 1
-    paketid = 0 -> repat -1
-    data -> byte array
-
-    """
-
-    ENTITY = 1
-    data  = bytearray(aLen)
-    PCODEClientB = codeA
-    packetId = i
-
-    if (packetId == repeat - 1):
-        doneRepeat = True
-
-    while (len(data) % 4 != 0):
-        data.append(0)
-
-    data_length = len(data) + 4 + aLen
-
-
-
-    packetBsending = pack("!IHHIs" , data_length, PCODE, ENTITY, packetId,data)
-
-    return packetBsending, udp_port, doneRepeat, packetId
-
-# return i
-def phaseBclient1Rec(packet):
-
-    # packetB1 = pack("!IHHI", data_length, PCODE, ENTITY, ak_packet_id)
-
-    data_length, PCODE, ENTITY, ak_packet_id = unpack("!IHHI")
-    print("Received acknowledgement packet from server: data_len:  {} pcode:  {} entity:  {} acknumber:  {}".format(data_length, ENTITY, ak_packet_id))
-
-    return ak_packet_id
-
-
+import struct
+import time
 
 serverName = 'localhost'
 #serverName = '10.84.88.53'
@@ -60,69 +12,59 @@ serverPort = 12000
 
 # Bind the socket to server address and server port
 clientSocket = socket(AF_INET, SOCK_DGRAM)
-sentence = input(' Input lower case sentence: ')
+print("-------------- Starting Stage A -------------")
+sentence = input('Input correct message (CASE SENSITIVE): ')
+pCode = 0
 ENTITY = 1
-PCODE = 0
+#may have to switch to bytes
 
-# -------------------------------------------------------------------------------------------
-"""
-struct: 
-    
-    data_length --> 4 bytes (length of packet)
-    pcode -> first phase == 0 (2 bytes)
-    entity -> 2 bytes, (client uses 1 and server uses 2)
-    data -> any siz % 4 == 0 (data must be padded until divisible by 4)
-
-"""
-
-# my additoin with the socket
-
-#change socket to be padded to for but for right now this should work ??
-
-x = 0
-data_length = len(sentence)
-# check if divisible by 4
-if (data_length % 4 > 0):
-    x = 1
-
-while (len(sentence) % 4 !=  0):
+while ((len(sentence) % 4) > 0):
     sentence += "0"
 
-# after padding we can now send the data
-sentenceStruct = pack('!IHH24s', len(sentence), PCODE, ENTITY, sentence.encode())
+dLength = len(sentence)
+sentenceStruct = struct.pack('!IHH24s',dLength,pCode,ENTITY,sentence.encode())
 
-# phase A send
-# -------------------------------------------------------------------------------------------
-# phase B recive
+clientSocket. sendto( sentenceStruct, (serverName, serverPort))
 
-#clientSocket.connect((serverName, serverPort))
-clientSocket.sendto( sentenceStruct, (serverName, serverPort))
+phaseASStruct, serverAddress = clientSocket.recvfrom(2048)
+dLength2, pCode2, ENTITY2, repeat, udp_port, len, codeA = struct.unpack('!IHHIIHH', phaseASStruct)
+print("Received Packet from server: data_len: {} pcode: {} entity: {} repeat: {} len: {} udp_port: {} codeA: {}".format(dLength2,pCode2,ENTITY2,repeat,len,udp_port,codeA))
+print("------------ End of Stage A ---------------")
+print()
+print("------------ Starting Stage B -------------")
 
-packetA, serverAddress = clientSocket.recvfrom(2048)
+pCode = codeA
+packet_id = 0
+data = bytearray(len)
+dLength = len + 4 
+count = 0
+while (dLength % 4 > 0):
+    data.append(0)
+    dLength += 1
 
-# creating new socket
-clientSocket2 = socket(AF_INET, SOCK_DGRAM) 
-i = 0
+clientSocket.connect((serverName, udp_port))
 
-packetBsending, udp_port, doneRepeat, packetId = phaseBclient1SEND(packetA, i)
+while(packet_id < repeat - 1):
 
-clientSocket2.sendto( packetBsending, (serverName, udp_port))
+    phaseBCStruct = struct.pack('!IHHIs', dLength, pCode, ENTITY, packet_id, data)
+    clientSocket.sendto(phaseBCStruct,(serverName, udp_port))
+    #somehow wait to receive ack packet
+    #need retransmission interval of 5 seconds
+    try:
+        ackStruct, serverAddress = clientSocket.recvfrom(2048)
+        dLength2, pCode, ENTITY2, acked_packet_id = struct.unpack('!IHHI',ackStruct)
+        print("Received acknowledgement packet from server: data_len: {} pcode: {} entity: {} acknumber: {}")
+        packet_id = acked_packet_id
+    
+    except:
+        time.sleep(5)
+        continue #after 5 seconds?
 
-while not doneRepeat:
-
-    packetB_rec = clientSocket2.recvfrom(2048)
-
-    akc = phaseBclient1Rec(packetB_rec)
-
-    if(ack == packetId):
-        # send new packetID
-        i += 1
-        packetBsending, udp_port, doneRepeat, packetId = phaseBclient1SEND(packetA, i)
-    else:
-        packetBsending, udp_port, doneRepeat, packetId = phaseBclient1SEND(packetA, i)
+        
+    
+   
 
 
-
-# print('From server: ', modifiedSentence.decode())
+#print('From server: ', phaseAC.decode())
 clientSocket.close()
 
