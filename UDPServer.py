@@ -17,13 +17,17 @@ print('The server is ready to receive')
 print("-------------Starting Stage A --------------")
 print()
 
-#serverSocket.settimeout(100)
+serverSocket.settimeout(5)
 sentenceStruct, clientAddress = serverSocket.recvfrom(1024)
 dLength, pCode, ENTITY, data = struct.unpack('!IHH16s', sentenceStruct)
 
 decodeSentence = data.decode()
 decodeSentence = decodeSentence.translate({ord('0'):None})
 print("receiving from the client: data_len: {} pcode: {} entity: {} data: {}".format(dLength, pCode, ENTITY, decodeSentence))
+
+if(len(sentenceStruct) != 8 + len(data)):
+	print("Incorect packet size CLOSING CONNECTION")
+	serverSocket.close()
 
 if (dLength % 4 != 0):
 	print("Incorect data length CLOSING CONNECTION")
@@ -59,10 +63,12 @@ print()
 print("SERVER:----------------- Starting Stage B -----------")
 
 while True:
-	#may have to add 3 sec timeout here 
+ 
 	phaseBC, clientAddress = serverSocket2.recvfrom(1024)
-	dLength2, pCode, ENTITY, packet_id, data = struct.unpack('!IHHIs', phaseBC)
-	#print("SERVER: received_packet_id = {} data_len = {} pcode: {}".format(packet_id,dLength2,pCode))
+
+	temp = len(phaseBC)
+	temp -= 12
+	dLength2, pCode, ENTITY, packet_id, data = struct.unpack('!IHHI' + str(temp) + 's', phaseBC)
 	
 	if(dLength2 % 4 != 0):
 		print("Incorect data length CLOSING CONNECTION")
@@ -107,7 +113,7 @@ pCode = codeB
 repeat2 = randint(5,20)
 len2 = randint(5,20)
 codeC = randint(100,400)
-char = 'J' #make this random maybe
+char = chr(randint(ord('A'), ord('Z')))
 
 phaseCStruct = struct.pack('!IHHIIIc',dLength,pCode,ENTITY2,repeat2,len2,codeC,char.encode())
 connectionSocket.send(phaseCStruct)
@@ -126,6 +132,14 @@ while i < repeat2:
 	temp = len(phaseDStruct)
 	temp -= 8
 	dLength2, pCode, ENTITY, data = struct.unpack('!IHH' + str(temp) + 's', phaseDStruct)
+
+	if(pCode != codeC or ENTITY != 1):
+		print("incorect PCode or entity CLOSING CONNECTION")
+		connectionSocket.close()
+	
+	if(dLength2 % 4 != 0):
+		print("Incorect data length CLOSING CONNECTION")
+		connectionSocket.close()
 
 	data = data.decode()
 	print("i = {} data_len: {} pcode: {} entity: {} data: {}".format(i, dLength2, pCode, ENTITY, data))
