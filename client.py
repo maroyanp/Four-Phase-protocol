@@ -14,6 +14,7 @@ def check_server_response(response):
     return 
 
 # serverName = 'localhost'
+# serverName = '99.250.87.197'
 serverName = "34.69.60.253"
 # Assign a port number
 serverPort = 12000
@@ -59,15 +60,10 @@ print(f"Received packet from server: data_len: {data_length}  pcode: {PCODE}  en
 print("------------ End of Stage A  ------------\n")
 print("------------ Starting Stage B  ------------")
 
-
-doneRepeat = False
 ENTITY = 1
 data  = bytearray(aLen)
 PCODE = codeA
 packetId = 0
-
-if (packetId == repeat - 1):
-    doneRepeat = True
 
 data_length = aLen + 4
 
@@ -75,7 +71,7 @@ while (data_length % 4 != 0):
     data.append(0)
     data_length += 1
 
-print(data_length)
+# print(data_length)
 # now we continue to send till acknowlegment
 # also we send and wait for a recive
 while (packetId < repeat ):
@@ -93,7 +89,7 @@ while (packetId < repeat ):
         packetId += 1
     
     except:
-        time.sleep(5)
+        # time.sleep(5)
         continue #after 5 seconds?
 
 # now recive from B2
@@ -110,7 +106,7 @@ print("------------ Starting Stage C  ------------")
 c_tcpSocket = socket(AF_INET, SOCK_STREAM)
 print("connecting to server at tcp port {}".format(tcp_port))
 c_tcpSocket.connect((serverName, tcp_port))
-time.sleep(5)
+time.sleep(3)
 p_client_r_C1 = c_tcpSocket.recv(1024)
 
 data_lengthC1, PCODE, ENTITY, repeat2, len2, codeC, Rchar = unpack("!IHHIIIc",p_client_r_C1)
@@ -144,6 +140,7 @@ data(filled with Rchar)
 p_client_s_D1 = pack("!IHH" + str(data_lengthD3) +"s", data_lengthD3, PCODE, ENTITY, msg)
 for i in range(repeat2):
     c_tcpSocket.send(p_client_s_D1)
+    time.sleep(1)
 
 p_client_r_D2 = c_tcpSocket.recv(2048)
 data_lengthD2, PCODE, entityD2, codeD = unpack("!IHHI", p_client_r_D2)
